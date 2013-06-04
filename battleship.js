@@ -1,95 +1,136 @@
+var ShipPosition = function() {
+    this.x1 = null;
+    this.y1 = null;
+    this.x2 = null;
+    this.y2 = null;
+};
 
-function Ship(size) {
-    var shipSize = size;
-    var coordX1, coordX2, coordY1, coordY2;
-    this.genPosition = function(v) {
-        return Math.floor((Math.random()*v));
-    }
+function Ship(shipSize) {
+    var self = this;
+    this.size = shipSize;
+    this.position = null;
+    this.genPosition = function(boardSize) {
+        return Math.floor((Math.random()*boardSize));
+    };
     this.genOrientation = function() {
         return Math.floor(Math.random()) ? "h" : "v";
-    }
-    this.genCandidate = function(board) {
-            var orient = this.genOrientation();
-            if (orient == "v") {
-                coordX1 = this.genPosition(10);
-                coordX2 = coordX1;
-                coordY1 = this.genPosition(10 - shipSize);
-                coordY2 = coordY1 + shipSize - 1;
-            } else if (orient == "h") {
-                coordY1 = this.genPosition(10);
-                coordY2 = coordY1;
-                coordX1 = this.genPosition(10 - shipSize);
-                coordX2 = coordX1 + shipSize - 1;
-            }
-    }
-    /*
-    this.setPosition = function(board) {
-        var x1 = this.genPosition();
-        var y1 = this.genPosition();
-
-        // first try vertically upwards
-        var x2 = x1;
-        var y2 = y2 - shipSize + 1;
-        if (y2 < 0) {
-         // try different orientation
-            if (board.isFree(x1, y1, x2, y2)) {
+    };
+    this.genCandidatePosition = function(board) {
+        // return a candidate position in such a way that the 
+        // ship will never exceeed the board bounds
+        var orient = self.genOrientation();
+        var position = new ShipPosition();
+        if (self.size > board.size) {
+            throw new Error("cannot place a ship of size " + self.size + " on board of size " + board.size);
+        }
+        if (orient == "v") {
+            position.x1 = self.genPosition(board.size);
+            position.x2 = position.x1;
+            position.y1 = self.genPosition(board.size - self.size);
+            position.y2 = position.y1 + self.size - 1;
+        } else if (orient == "h") {
+            position.y1 = self.genPosition(board.size);
+            position.y2 = position.y1;
+            position.x1 = self.genPosition(board.size - self.size);
+            position.x2 = position.x1 + self.size - 1;
+        }
+        console.log("Trying out position: (" 
+        + position.x1 + "," 
+        + position.y1 + "),(" 
+        + position.x2 + "," 
+        + position.y2 + ")");
+        return position;
+    };
+    this.placeOn = function(board) {
+        console.log("Placing a ship of size " + self.size);
+        // Simplest version -- keep generating candidate positions
+        // until a free spot is found:
+        var position;
+        var i;
+        for (i = 0; i < 10; i++) {
+            // try to place a ship ten times, if still not placed, fail
+            position = ship.genCandidatePosition(board);
+            if (board.isFree(position)) {
                 break;
-            } else {
             }
-    }*/
+        }
+        if (board.isFree(position)) {
+            board.markAsTaken(position);
+            self.position = position;
+            board.ships.push(ship);
+            return true;
+        } else {
+            console.log("After " + i + " tries, could not find a position for a ship of size " + self.size);
+            return false;
+        }
+    };
 }
 
-var Cell = {
-    avail: true,
-    setAvailable: function(av) {
+function Cell() {
+    this.avail = true;
+    this.setAvailable = function(av) {
         this.avail = av;
-    },
-    isFree: function() {
-        return avail;
-    }
+    };
+    this.available = function() {
+        return this.avail;
+    };
 }
 
-var board = {
-    cells: null,
-    populate: function(size) {
-        cells = new Array(size);
+function Board(boardSize) {
+    var self = this;
+    this.size = 0;
+    this.ships = [];
+    this.cells = null;
+    this.populate = function(size) {
+        self.cells = new Array(size);
         for (var i = 0; i < size; i++) {
-            cells[i] = new Array(size);
+            self.cells[i] = new Array(size);
             for (var j = 0; j < size; j++) {
-                cells[i][j] = new Cell;
+                self.cells[i][j] = new Cell();
             }
         }
-    },
-    placeShip: function(numShips, shipSize) {
-        for (var s = 0; s < numShips; s++) {
-            var good = false;
-            while (good == false) {
-                var ship = new Ship(shipSize);
-                ship.genCandidate();
-                if (this.isFree(ship.coordX1, ship.coordX2, ship.coordY1, ship.coordY2)) {
-                    good = true;
-                    break;
-                }
-            }
-        }
-    },
-    isFree: function(x1, y1, x2, y2) {
-        var x1_ = Math.min(x1, x2);
-        var x2_ = Math.max(x1, x2);
-        var y1_ = Math.min(y1, y2);
-        var y2_ = Math.max(y1, y2);
+        self.size = size;        
+    };
+
+    this.markAsTaken = function(position) {
+        var x1_ = Math.min(position.x1, position.x2);
+        var x2_ = Math.max(position.x1, position.x2);
+        var y1_ = Math.min(position.y1, position.y2);
+        var y2_ = Math.max(position.y1, position.y2);
         for (var i = x1_; i <= x2_; i++) {
             for (var j = y1_; i <= y2_; i++) {
-                if (!cells[i][j].isAvailable()) {
+                var cell = self.cells[i][j];
+                cell.setAvailable(false);
+            }
+        }       
+    };
+
+    this.isFree = function(position) {
+        var x1_ = Math.min(position.x1, position.x2);
+        var x2_ = Math.max(position.x1, position.x2);
+        var y1_ = Math.min(position.y1, position.y2);
+        var y2_ = Math.max(position.y1, position.y2);
+        for (var i = x1_; i <= x2_; i++) {
+            for (var j = y1_; i <= y2_; i++) {
+                var cell = self.cells[i][j];
+                if (!cell.available()) {
                     return false;
                 }
             }
         }
         return true;
-    },
-    checkState: function(x, y) {
-        return 0;
-    }
+    };
+
+    // initialize to given size
+    this.populate(boardSize);
+    return this;
 };
 
-
+// try the whole thing
+var board = new Board(10);
+for (var size = 1; size <= 10; size++) {
+    for (var repeat = 1; repeat <= 5; repeat++) {
+        var ship = new Ship(size);
+        ship.placeOn(board);
+    }
+}
